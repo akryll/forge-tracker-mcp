@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "forge": {
+      "command": "node",
+      "args": ["dist/index.js"],
+      "env": {
+        "FORGE_AGENT_KEY": "${FORGE_AGENT_KEY}",
+        "FORGE_API_URL": "${FORGE_API_URL:-http://localhost:8090/api/v1}"
+      }
+    }
+  }
+}
