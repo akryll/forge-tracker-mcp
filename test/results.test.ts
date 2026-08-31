@@ -40,6 +40,70 @@ test("комментарий подписан ключом, а не тексто
   }
 });
 
+test("переписка читается целиком, ответ человека отличим от записи агента", async () => {
+  const h = await harness({
+    "GET /tasks/6127/comments": () => ({
+      status: 200,
+      json: [
+        {
+          id: 1,
+          author_name: "Claude2",
+          by_agent: true,
+          body: "Какой стек брать?",
+          created_at: "2026-08-30T21:00:00+03:00",
+        },
+        {
+          id: 2,
+          author_name: "Антон",
+          by_agent: false,
+          body: "Бери предложенный.",
+          created_at: "2026-08-30T21:05:00+03:00",
+        },
+      ],
+    }),
+  });
+  try {
+    const { text, isError } = await h.call("forge_comments_list", { task_id: 6127 });
+    assert.equal(isError, false);
+    // Порядок сохраняется: переписку читают сверху вниз.
+    assert.ok(text.indexOf("Какой стек брать?") < text.indexOf("Бери предложенный."));
+    assert.match(text, /Claude2 \(агент\)/);
+    assert.match(text, /— Антон, /);
+    assert.doesNotMatch(text, /Антон \(агент\)/);
+  } finally {
+    await h.close();
+  }
+});
+
+test("пустая переписка проговаривается словами", async () => {
+  const h = await harness({ "GET /tasks/6127/comments": () => ({ status: 200, json: [] }) });
+  try {
+    const { text } = await h.call("forge_comments_list", { task_id: 6127 });
+    assert.match(text, /ещё ничего не написано/);
+  } finally {
+    await h.close();
+  }
+});
+
+test("переписка чужой задачи не отдаётся", async () => {
+  const h = await harness({
+    "GET /tasks/1/comments": () => ({
+      status: 404,
+      json: { code: "not_found", message: "Задача не найдена" },
+    }),
+  });
+  try {
+    const { text, isError } = await h.call("forge_comments_list", { task_id: 1 });
+    assert.equal(isError, true);
+    // Граница здесь по проекту ключа, а не по назначению: говорить про
+    // «не назначена» было бы неправдой — переписка коллеги по проекту видна.
+    assert.match(text, /не найдена в вашем проекте/);
+    assert.doesNotMatch(text, /не назначена/);
+  } finally {
+    await h.close();
+  }
+});
+
 test("одноимённый документ заменяется, а не кладётся вторым", async () => {
   let put = 0;
   const h = await harness({

@@ -68,6 +68,51 @@ test("пустая очередь объясняется словами, а не
   }
 });
 
+test("карточка показывает, чего задача ждёт и кто ждёт её", async () => {
+  const BLOCKED = {
+    ...MINE,
+    blocked_by_ids: [6127, 6128],
+    blocked_by: [
+      { id: 6127, title: "Результаты работы", status: "review" },
+      // Блокер уехал в другой проект: остался один номер.
+      { id: 6128, title: null, status: null },
+    ],
+    blocking: [{ id: 6129, title: "Понятные отказы", status: "in_progress" }],
+  };
+  const h = await harness({ "GET /agent/tasks": queue([BLOCKED]) });
+  try {
+    const { text } = await h.call("forge_tasks_list", { task_id: 6125 });
+    assert.match(text, /Заблокирована, ждёт:/);
+    assert.match(text, /#6127 Результаты работы — на проверке/);
+    assert.match(text, /#6128 — в другом проекте, подробностей не видно/);
+    assert.match(text, /сначала спросите человека/);
+    assert.match(text, /Её саму ждут:/);
+    assert.match(text, /#6129 Понятные отказы — в работе/);
+  } finally {
+    await h.close();
+  }
+});
+
+test("очередь остаётся читаемой: в списке номера, разбор — в карточке", async () => {
+  const many = [6127, 6128, 6129, 6130, 6131];
+  const BLOCKED = {
+    ...MINE,
+    blocked_by_ids: many,
+    blocked_by: many.map((id) => ({ id, title: `Задача ${id}`, status: "todo" })),
+    blocking: [],
+  };
+  const h = await harness({ "GET /agent/tasks": queue([BLOCKED]) });
+  try {
+    const { text } = await h.call("forge_tasks_list");
+    assert.match(text, /заблокирована: ждёт #6127, #6128, #6129, #6130, #6131/);
+    // Названия пяти блокеров в очереди раздули бы её вчетверо.
+    assert.doesNotMatch(text, /Заблокирована, ждёт:/);
+    assert.ok(text.split("\n").length < 12, `очередь распухла:\n${text}`);
+  } finally {
+    await h.close();
+  }
+});
+
 test("карточка задачи отдаёт постановку и промт агента", async () => {
   const h = await harness({ "GET /agent/tasks": queue([MINE]) });
   try {
@@ -140,7 +185,98 @@ test("вердикт тестировщика переводит задачу в
   try {
     const { text, isError } = await h.call("forge_task_verify", { task_id: 6099 });
     assert.equal(isError, false);
-    assert.match(text, /#6099 отмечена как проверенная — статус проверено/);
+    assert.match(text, /#6099 принята — статус проверено/);
+  } finally {
+    await h.close();
+  }
+});
+
+test("возврат с проверки переводит задачу в работу и записывает причину", async () => {
+  const h = await harness({
+    "GET /agent/tasks": queue([TO_TEST]),
+    "POST /agent/tasks/6099/rework": () => ({
+      status: 200,
+      json: { ...TO_TEST, status: "in_progress" },
+    }),
+  });
+  try {
+    const { text, isError } = await h.call("forge_task_rework", {
+      task_id: 6099,
+      comment: "Фильтры съезжают на 390px — скриншот в задаче.",
+    });
+    assert.equal(isError, false);
+    assert.match(text, /#6099 возвращена с проверки — статус в работе/);
+    assert.match(text, /причина записана комментарием/);
+    assert.deepEqual(JSON.parse(h.forge.requests.at(-1)?.body ?? "{}"), {
+      comment: "Фильтры съезжают на 390px — скриншот в задаче.",
+    });
+  } finally {
+    await h.close();
+  }
+});
+
+test("возврат без причины до Forge не доходит", async () => {
+  const h = await harness({ "GET /agent/tasks": queue([TO_TEST]) });
+  try {
+    const { text, isError } = await h.call("forge_task_rework", { task_id: 6099, comment: "" });
+    assert.equal(isError, true);
+    // Причина — не пожелание в описании, а обязательное поле схемы.
+    assert.match(text, /comment/);
+    assert.equal(h.forge.requests.length, 0);
+  } finally {
+    await h.close();
+  }
+});
+
+test("возврат задачи не на проверке объясняется", async () => {
+  const h = await harness({
+    "GET /agent/tasks": queue([TO_TEST]),
+    "POST /agent/tasks/6099/rework": () => ({
+      status: 409,
+      json: { code: "conflict", message: "Задача не на проверке" },
+    }),
+  });
+  try {
+    const { text, isError } = await h.call("forge_task_rework", {
+      task_id: 6099,
+      comment: "Не сошлось",
+    });
+    assert.equal(isError, true);
+    assert.match(text, /не на проверке/);
+    assert.match(text, /исход проверки закрепляют на сданной работе/);
+  } finally {
+    await h.close();
+  }
+});
+
+test("исполнителю возврат с проверки не открыт", async () => {
+  const h = await harness({
+    "GET /agent/tasks": queue([MINE]),
+    "POST /agent/tasks/6125/rework": () => ({
+      status: 404,
+      json: { code: "not_found", message: "Задача не найдена" },
+    }),
+  });
+  try {
+    const { text, isError } = await h.call("forge_task_rework", {
+      task_id: 6125,
+      comment: "Не сошлось",
+    });
+    assert.equal(isError, true);
+    assert.match(text, /не назначена тестировщиком/);
+  } finally {
+    await h.close();
+  }
+});
+
+test("нигде не сказано, что возврат агенту недоступен", async () => {
+  const h = await harness({});
+  try {
+    const { tools } = await h.client.listTools();
+    const verify = tools.find((tool) => tool.name === "forge_task_verify");
+    assert.doesNotMatch(verify?.description ?? "", /статус не трогайте/);
+    assert.match(verify?.description ?? "", /forge_task_rework/);
+    assert.ok(tools.some((tool) => tool.name === "forge_task_rework"));
   } finally {
     await h.close();
   }
@@ -198,6 +334,74 @@ test("ключ без проекта задач не заводит, и это �
     const { text, isError } = await h.call("forge_task_create", { title: "Что-нибудь" });
     assert.equal(isError, true);
     assert.match(text, /Ключ без проекта не заводит задачи/);
+  } finally {
+    await h.close();
+  }
+});
+
+test("агент убирает за собой заведённую задачу", async () => {
+  const h = await harness({
+    "POST /agent/tasks/6200/archive": () => ({ status: 204, json: null }),
+  });
+  try {
+    const { text, isError } = await h.call("forge_task_archive", { task_id: 6200 });
+    assert.equal(isError, false);
+    assert.match(text, /#6200 убрана в архив/);
+    assert.match(text, /Вернуть её оттуда может человек/);
+    assert.equal(h.forge.requests[0]?.method, "POST");
+  } finally {
+    await h.close();
+  }
+});
+
+test("чужую заведённую задачу убрать нельзя", async () => {
+  const h = await harness({
+    "POST /agent/tasks/1/archive": () => ({
+      status: 404,
+      json: { code: "not_found", message: "Задача не найдена" },
+    }),
+  });
+  try {
+    const { text, isError } = await h.call("forge_task_archive", { task_id: 1 });
+    assert.equal(isError, true);
+    assert.match(text, /завёл не этот агент/);
+    // Не «не назначена»: назначение тут ни при чём, важно авторство.
+    assert.doesNotMatch(text, /не назначена/);
+  } finally {
+    await h.close();
+  }
+});
+
+test("своя, но уже убранная задача — «делать нечего», а не граница прав", async () => {
+  const h = await harness({
+    "POST /agent/tasks/6200/archive": () => ({
+      status: 409,
+      json: { code: "conflict", message: "Задача уже в архиве" },
+    }),
+  });
+  try {
+    const { text, isError } = await h.call("forge_task_archive", { task_id: 6200 });
+    assert.equal(isError, true);
+    assert.match(text, /уже в архиве — убирать нечего/);
+    // Не «завёл не этот агент»: агент её видел, врать ему незачем.
+    assert.doesNotMatch(text, /завёл не этот агент/);
+  } finally {
+    await h.close();
+  }
+});
+
+test("взятую задачу убирать поздно, и это сказано отдельно", async () => {
+  const h = await harness({
+    "POST /agent/tasks/6200/archive": () => ({
+      status: 409,
+      json: { code: "conflict", message: "За задачу уже взялись — убирать поздно" },
+    }),
+  });
+  try {
+    const { text, isError } = await h.call("forge_task_archive", { task_id: 6200 });
+    assert.equal(isError, true);
+    assert.match(text, /уже не свободна/);
+    assert.match(text, /скажите человеку/);
   } finally {
     await h.close();
   }

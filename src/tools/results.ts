@@ -14,6 +14,14 @@ function size(bytes: number): string {
   return bytes < 1024 ? `${bytes} Б` : `${(bytes / 1024).toFixed(1)} КБ`;
 }
 
+/** Дата без секунд: агенту важен порядок записей, а не миллисекунды. */
+function date(iso: string): string {
+  const value = new Date(iso);
+  return Number.isNaN(value.getTime())
+    ? iso
+    : value.toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" });
+}
+
 export function registerResultTools(server: McpServer, results: ResultsService): void {
   server.registerTool(
     "forge_comment_add",
@@ -34,6 +42,36 @@ export function registerResultTools(server: McpServer, results: ResultsService):
       try {
         const comment = await results.addComment(task_id, body);
         return toolText(`Комментарий записан в задачу #${task_id} за подписью «${comment.author_name}».`);
+      } catch (error) {
+        return toolFailure(error, { action: "comment", taskId: task_id });
+      }
+    },
+  );
+
+  server.registerTool(
+    "forge_comments_list",
+    {
+      title: "Переписка задачи",
+      description: [
+        "Переписка задачи от старых записей к новым: чем человек и другие агенты отвечали по этой работе.",
+        "Здесь же ищут ответ на свой вопрос: forge_task_ask ставит вопрос, а отвечает человек комментарием —",
+        "больше нигде этот ответ не виден.",
+        "Читать стоит и перед началом работы: в переписке лежат замечания, из-за которых задачу вернули.",
+      ].join(" "),
+      inputSchema: z.object({ task_id: taskId }).catchall(FORBIDDEN_FIELD),
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ task_id }) => {
+      try {
+        const comments = await results.listComments(task_id);
+        if (comments.length === 0) {
+          return toolText(`В задаче #${task_id} ещё ничего не написано.`);
+        }
+        const lines = comments.map((comment) => {
+          const who = comment.by_agent ? `${comment.author_name} (агент)` : comment.author_name;
+          return `— ${who}, ${date(comment.created_at)}:\n${comment.body.trim()}`;
+        });
+        return toolText([`Переписка задачи #${task_id}:`, ...lines].join("\n\n"));
       } catch (error) {
         return toolFailure(error, { action: "comment", taskId: task_id });
       }

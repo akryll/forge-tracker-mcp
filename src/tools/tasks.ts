@@ -236,13 +236,11 @@ export function registerTesterTools(server: McpServer, tasks: TaskService): void
     {
       title: "Закрепить проверку",
       description: [
-        "Тестировщик подтверждает, что проверил задачу: «на проверке» → «проверено».",
-        "Единственный переход, доверенный тестировщику, и работает он только на задачах,",
-        "где тестировщик — вы.",
-        "Ставить его стоит после того, как вердикт записан комментарием и документом:",
+        "Первый из двух исходов проверки: работа принята, «на проверке» → «проверено».",
+        "Работает только на задачах, где тестировщик — вы.",
+        "Ставить стоит после того, как разбор записан комментарием и документом:",
         "статус без разбора человеку ничего не говорит.",
-        "Не прошло — статус не трогайте: вернуть задачу на доработку решает человек,",
-        "а вы пишете, что именно не сошлось, комментарием.",
+        "Не приняли работу — forge_task_rework, а не молчание и не этот инструмент.",
       ].join(" "),
       inputSchema: z.object({ task_id: taskId }).catchall(FORBIDDEN_FIELD),
       annotations: { openWorldHint: true },
@@ -250,9 +248,51 @@ export function registerTesterTools(server: McpServer, tasks: TaskService): void
     async ({ task_id }) => {
       try {
         const task = await tasks.verify(task_id);
-        return toolText(`Задача #${task.id} отмечена как проверенная — статус ${STATUS_LABEL[task.status]}.`);
+        return toolText(
+          `Задача #${task.id} принята — статус ${STATUS_LABEL[task.status]}.`,
+        );
       } catch (error) {
         return toolFailure(error, { action: "verify", taskId: task_id });
+      }
+    },
+  );
+
+  server.registerTool(
+    "forge_task_rework",
+    {
+      title: "Вернуть задачу с проверки",
+      description: [
+        "Второй из двух исходов проверки: работа не принята, «на проверке» → «в работе».",
+        "Единственный обратный переход, доверенный агенту, и работает он только на задачах,",
+        "где тестировщик — вы.",
+        "Причина обязательна и ложится комментарием в задачу: возврат без объяснения",
+        "исполнителю бесполезен — он не узнает, что именно чинить.",
+        "Молчание вместо возврата хуже обоих: задача повиснет на проверке, и никто этого не заметит.",
+      ].join(" "),
+      inputSchema: z
+        .object({
+          task_id: taskId,
+          comment: z
+            .string()
+            .min(1)
+            .max(10_000)
+            .describe(
+              "Что не сошлось и как это увидеть: шаги, ожидаемое и полученное. " +
+                "По этому тексту исполнитель будет чинить, другого он не получит.",
+            ),
+        })
+        .catchall(FORBIDDEN_FIELD),
+      annotations: { openWorldHint: true },
+    },
+    async ({ task_id, comment }) => {
+      try {
+        const task = await tasks.rework(task_id, comment);
+        return toolText(
+          `Задача #${task.id} возвращена с проверки — статус ${STATUS_LABEL[task.status]}, ` +
+            `причина записана комментарием.`,
+        );
+      } catch (error) {
+        return toolFailure(error, { action: "rework", taskId: task_id });
       }
     },
   );
@@ -264,6 +304,8 @@ export function registerTesterTools(server: McpServer, tasks: TaskService): void
       description: [
         "Задача, которую агент предлагает сам: нашёл по ходу работы то, что чинить не здесь.",
         "Уходит в общий список без исполнителя и в статусе «к выполнению» — назначает человек.",
+        "Завели задачу для проверки — уберите её потом сами через forge_task_archive:",
+        "пока её никому не назначили, это ваше дело, а не человека.",
         "Проект берётся из ключа, указывать его не нужно.",
         "Срок и приоритет не задаются: их расставляет человек, когда берёт задачу в работу.",
       ].join(" "),
@@ -302,6 +344,33 @@ export function registerTesterTools(server: McpServer, tasks: TaskService): void
         );
       } catch (error) {
         return toolFailure(error, { action: "create" });
+      }
+    },
+  );
+
+  server.registerTool(
+    "forge_task_archive",
+    {
+      title: "Убрать за собой заведённую задачу",
+      description: [
+        "Убирает в архив задачу, которую завёл этот же агент.",
+        "Для проверочных задач: завёл по ходу работы — убери, а не оставляй человеку с припиской «это мусор».",
+        "Право узкое, и это видно по отказам: убрать можно только своё, только пока задаче",
+        "не назначили исполнителя и никто её не взял.",
+        "Чужую или уже взятую задачу убрать нельзя — если она лишняя, скажите человеку.",
+        "Вернуть убранное может только человек.",
+      ].join(" "),
+      inputSchema: z.object({ task_id: taskId }).catchall(FORBIDDEN_FIELD),
+      annotations: { openWorldHint: true },
+    },
+    async ({ task_id }) => {
+      try {
+        await tasks.archive(task_id);
+        return toolText(
+          `Задача #${task_id} убрана в архив. Вернуть её оттуда может человек.`,
+        );
+      } catch (error) {
+        return toolFailure(error, { action: "archive", taskId: task_id });
       }
     },
   );

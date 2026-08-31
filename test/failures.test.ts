@@ -103,7 +103,7 @@ test("409 на вердикт: задача не на проверке", async (
   try {
     const { text } = await h.call("forge_task_verify", { task_id: 6129 });
     assert.match(text, /не на проверке/);
-    assert.match(text, /вердикт закрепляют на сданной работе/);
+    assert.match(text, /исход проверки закрепляют на сданной работе/);
   } finally {
     await h.close();
   }
@@ -193,7 +193,17 @@ test("заблокированная задача предупреждает о 
       json: {
         agent: { id: 516, name: "Claude2" },
         member: ME,
-        tasks: [{ ...TASK, blocked_by_ids: [6127, 6128] }],
+        tasks: [
+          {
+            ...TASK,
+            blocked_by_ids: [6127, 6128],
+            blocked_by: [
+              { id: 6127, title: "Результаты работы", status: "review" },
+              { id: 6128, title: "Тестировщик", status: "review" },
+            ],
+            blocking: [],
+          },
+        ],
       },
     }),
   });
@@ -202,8 +212,11 @@ test("заблокированная задача предупреждает о 
     assert.match(list.text, /заблокирована: ждёт #6127, #6128/);
     assert.match(list.text, /сначала спросите человека/);
 
+    // В карточке — разбор, а не та же короткая строка.
     const card = await h.call("forge_tasks_list", { task_id: 6129 });
-    assert.match(card.text, /заблокирована: ждёт #6127, #6128/);
+    assert.match(card.text, /Заблокирована, ждёт:/);
+    assert.match(card.text, /#6127/);
+    assert.match(card.text, /#6128/);
   } finally {
     await h.close();
   }

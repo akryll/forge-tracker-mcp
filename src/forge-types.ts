@@ -16,6 +16,13 @@ export interface MemberRef extends Named {
   readonly agent?: Named | null;
 }
 
+/** Связанная задача коротко. Без названия — она в другом проекте. */
+export interface Blocker {
+  readonly id: number;
+  readonly title?: string | null;
+  readonly status?: TaskStatus | null;
+}
+
 export interface Task {
   readonly id: number;
   readonly title: string;
@@ -35,6 +42,8 @@ export interface Task {
   readonly task_type?: Named | null;
   readonly agent_prompt?: string | null;
   readonly blocked_by_ids: number[];
+  readonly blocked_by?: Blocker[];
+  readonly blocking?: Blocker[];
   readonly blocks_open: number;
   readonly claimed_by?: Named | null;
   readonly claimed_at?: string | null;

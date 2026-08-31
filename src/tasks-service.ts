@@ -71,6 +71,18 @@ export class TaskService {
     });
   }
 
+  async rework(taskId: number, comment: string): Promise<Task> {
+    return await this.#client.requestJson<Task>(`/agent/tasks/${taskId}/rework`, {
+      method: "POST",
+      body: { comment },
+    });
+  }
+
+  /** Уборка отвечает `204` без тела: возвращать тут нечего. */
+  async archive(taskId: number): Promise<void> {
+    await this.#client.requestJson<void>(`/agent/tasks/${taskId}/archive`, { method: "POST" });
+  }
+
   async create(draft: TaskDraft): Promise<Task> {
     return await this.#client.requestJson<Task>("/agent/tasks", {
       method: "POST",

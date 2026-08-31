@@ -5,6 +5,9 @@ import type { ForgeClient } from "./forge-client.js";
 export interface Comment {
   readonly id: number;
   readonly author_name: string;
+  /** Записал агент, а не человек. Ответ на свой вопрос агент ищет среди людских. */
+  readonly by_agent: boolean;
+  readonly body: string;
   readonly created_at: string;
 }
 
@@ -73,6 +76,10 @@ export class ResultsService {
       method: "POST",
       body: { body },
     });
+  }
+
+  async listComments(taskId: number): Promise<Comment[]> {
+    return await this.#client.requestJson<Comment[]>(`/tasks/${taskId}/comments`);
   }
 
   async putDocument(taskId: number, filename: string, content: string): Promise<DocumentContent> {

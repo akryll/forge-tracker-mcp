@@ -2,6 +2,7 @@ import {
   PRIORITY_LABEL,
   STATUS_LABEL,
   type AgentTasks,
+  type Blocker,
   type Task,
 } from "./forge-types.js";
 
@@ -60,7 +61,20 @@ function facts(task: Task, role: Role): string[] {
   return kept.filter((item): item is string => item !== null);
 }
 
-/** Строка про блокеры: пока они открыты, задачу закрывать нельзя. */
+/** Одна связанная задача строкой. Без названия — она в другом проекте. */
+function blockerLine(blocker: Blocker): string {
+  if (!blocker.title) {
+    return `#${blocker.id} — в другом проекте, подробностей не видно`;
+  }
+  const status = blocker.status ? STATUS_LABEL[blocker.status] : "статус неизвестен";
+  return `#${blocker.id} ${blocker.title} — ${status}`;
+}
+
+/**
+ * Короткая строка про блокеры для списка: номера и предупреждение. Разбор
+ * по названиям сюда не влезет — очередь из семи задач с блокерами у каждой
+ * перестанет читаться.
+ */
 export function blockersLine(task: Task): string | null {
   if (task.blocked_by_ids.length === 0) return null;
   const list = task.blocked_by_ids.map((id) => `#${id}`).join(", ");
@@ -68,6 +82,34 @@ export function blockersLine(task: Task): string | null {
     `заблокирована: ждёт ${list} — сдавать её и закрывать, пока блокеры открыты, ` +
     `не стоит: сначала спросите человека`
   );
+}
+
+/**
+ * Разбор связей для карточки: чего ждёт задача и кто ждёт её. Здесь место
+ * подробностям — по этим строкам и решают, ждать или идти к человеку.
+ */
+export function blockersBlock(task: Task): string | null {
+  const parts: string[] = [];
+
+  const blockers = task.blocked_by ?? [];
+  if (blockers.length > 0) {
+    parts.push(
+      ["Заблокирована, ждёт:", ...blockers.map((b) => `  ${blockerLine(b)}`)].join("\n"),
+    );
+    // Открытый блокер — не запрет, а повод спросить: решение за человеком.
+    parts.push(
+      "Сдавать и закрывать её, пока блокеры открыты, не стоит: сначала спросите человека.",
+    );
+  }
+
+  const blocking = task.blocking ?? [];
+  if (blocking.length > 0) {
+    // Обратная сторона: откладывая эту задачу, агент держит чужую.
+    parts.push(
+      ["Её саму ждут:", ...blocking.map((b) => `  ${blockerLine(b)}`)].join("\n"),
+    );
+  }
+  return parts.length > 0 ? parts.join("\n\n") : null;
 }
 
 /** Короткая строка для списка: чтобы очередь читалась целиком, а не по кускам. */
@@ -86,7 +128,7 @@ export function formatTaskLine(task: Task, role: Role): string {
 export function formatTaskCard(task: Task, role: Role): string {
   const parts = [`#${task.id} ${task.title}`, facts(task, role).join(" · ")];
 
-  const blockers = blockersLine(task);
+  const blockers = blockersBlock(task);
   if (blockers) parts.push(blockers);
   if (task.question && task.question_text) {
     parts.push(`Вопрос человеку (ждёт ответа):\n${task.question_text}`);
