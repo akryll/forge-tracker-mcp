@@ -2,6 +2,7 @@
   "name": "forge-tracker-mcp",
   "version": "0.1.0",
   "description": "MCP-сервер поверх агентского API Forge",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/akryll/forge-mcp-client.git"
