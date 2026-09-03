@@ -1,9 +1,32 @@
-# forge-mcp
+# forge-tracker-mcp
 
-MCP-сервер поверх агентского API [Forge](http://localhost:3000). Один адаптер
-вместо голого `curl` в каждом агенте: Claude Code, Codex и любой следующий
-агент получают одинаковый набор инструментов, а ключ агента остаётся внутри
-сервера и наружу не выходит.
+MCP-сервер поверх агентского API Forge. Один адаптер вместо голого `curl` в
+каждом агенте: Claude Code, Codex и любой следующий агент получают одинаковый
+набор инструментов, а ключ агента остаётся внутри сервера и наружу не выходит.
+
+## Быстрый старт
+
+```bash
+npm i -g forge-tracker-mcp
+export FORGE_AGENT_KEY=fga_...
+forge-mcp
+```
+
+Ключ выдаёт человек на странице `/agents` в Forge. Если Forge не на
+`localhost:8090`, добавьте `export FORGE_API_URL=https://forge.example/api/v1`.
+
+Сервер молчит и ждёт клиента — так и надо: stdio-транспорт разговаривает не с
+человеком. Убедиться, что всё на месте, можно так:
+
+```bash
+forge-mcp --help
+```
+
+Подключить к Claude Code — одна команда:
+
+```bash
+claude mcp add forge --env FORGE_AGENT_KEY=fga_... -- forge-mcp
+```
 
 ## Инструменты
 
@@ -43,11 +66,29 @@ MCP-сервер поверх агентского API [Forge](http://localhost:
 удалённых) и общий клиент к REST Forge: заголовок `X-Agent-Key`, таймауты,
 разбор ответа об ошибке (`code`, `message`).
 
-## Сборка
+## Установка
 
 ```bash
+npm i -g forge-tracker-mcp
+```
+
+Появляется команда `forge-mcp` — она короче имени пакета, и длинных путей до
+`dist/index.js` больше нигде не нужно.
+
+Без установки, разово:
+
+```bash
+npx -y forge-tracker-mcp
+```
+
+Из исходников — если правите сам сервер:
+
+```bash
+git clone https://github.com/akryll/forge-mcp-client.git
+cd forge-mcp-client
 npm install
 npm run build
+npm link   # чтобы `forge-mcp` заработал и отсюда
 ```
 
 Проверки:
@@ -86,16 +127,26 @@ forge-mcp --http --port 8765
 Аргументы `--host`, `--port`, `--path` перекрывают переменные окружения;
 `--help` печатает подсказку.
 
+Клиенты MCP запускают сервер сами, и не все из них видят тот же `PATH`, что
+ваш терминал. Если клиент жалуется, что команда не найдена, подставьте в его
+конфиг полный путь — его покажет `which forge-mcp` (на Windows `where`).
+
 ## Подключение к Claude Code
 
-`.mcp.json` в корне проекта (или `~/.claude.json` для всех проектов):
+Одной командой:
+
+```bash
+claude mcp add forge --env FORGE_AGENT_KEY=fga_... -- forge-mcp
+```
+
+Либо руками — `.mcp.json` в корне проекта (или `~/.claude.json` для всех
+проектов):
 
 ```json
 {
   "mcpServers": {
     "forge": {
-      "command": "node",
-      "args": ["/путь/к/forge-tracker-mcp/dist/index.js"],
+      "command": "forge-mcp",
       "env": {
         "FORGE_AGENT_KEY": "fga_...",
         "FORGE_API_URL": "http://localhost:8090/api/v1"
@@ -105,16 +156,23 @@ forge-mcp --http --port 8765
 }
 ```
 
-В репозитории уже лежит [`.mcp.json`](.mcp.json) — он берёт ключ из переменной
-окружения, а не хранит его в файле: секрету в репозитории не место. Достаточно
-собрать сервер и задать `FORGE_AGENT_KEY` в окружении, из которого запускается
-Claude Code.
+Без установки в систему то же самое даёт `npx`:
 
-То же одной командой:
-
-```bash
-claude mcp add forge --env FORGE_AGENT_KEY=fga_... -- node /путь/к/forge-tracker-mcp/dist/index.js
+```json
+{
+  "mcpServers": {
+    "forge": {
+      "command": "npx",
+      "args": ["-y", "forge-tracker-mcp"],
+      "env": { "FORGE_AGENT_KEY": "fga_..." }
+    }
+  }
+}
 ```
+
+В репозитории лежит свой [`.mcp.json`](.mcp.json) — он запускает собранный
+`dist/index.js` и берёт ключ из переменной окружения, а не хранит его в файле:
+секрету в репозитории не место. Это вариант для тех, кто правит сам сервер.
 
 Проверить, что сервер подхватился, — `/mcp` в Claude Code: в списке появится
 `forge`, а в нём инструмент `forge_guide`.
@@ -125,8 +183,7 @@ claude mcp add forge --env FORGE_AGENT_KEY=fga_... -- node /путь/к/forge-tr
 
 ```toml
 [mcp_servers.forge]
-command = "node"
-args = ["/путь/к/forge-tracker-mcp/dist/index.js"]
+command = "forge-mcp"
 env = { FORGE_AGENT_KEY = "fga_...", FORGE_API_URL = "http://localhost:8090/api/v1" }
 ```
 
