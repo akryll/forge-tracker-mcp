@@ -23,6 +23,18 @@ export interface Blocker {
   readonly status?: TaskStatus | null;
 }
 
+/** Скилл типа задачи: имя и описание — то, что видно в карточке. */
+export interface SkillRef {
+  readonly id: number;
+  readonly name: string;
+  readonly description?: string | null;
+}
+
+/** Скилл целиком: тело читается отдельным инструментом. */
+export interface Skill extends SkillRef {
+  readonly body: string;
+}
+
 export interface Task {
   readonly id: number;
   readonly title: string;
@@ -39,7 +51,7 @@ export interface Task {
   readonly tester?: MemberRef | null;
   readonly project?: Named | null;
   readonly epic?: Named | null;
-  readonly task_type?: Named | null;
+  readonly task_type?: (Named & { readonly skills?: readonly SkillRef[] }) | null;
   readonly agent_prompt?: string | null;
   readonly blocked_by_ids: number[];
   readonly blocked_by?: Blocker[];

@@ -5,6 +5,7 @@ import { ResultsService } from "./results-service.js";
 import { TaskService } from "./tasks-service.js";
 import { registerGuide } from "./tools/guide.js";
 import { registerResultTools } from "./tools/results.js";
+import { registerSkillTools } from "./tools/skills.js";
 import { registerTaskTools, registerTesterTools } from "./tools/tasks.js";
 
 export const SERVER_NAME = "forge";
@@ -31,6 +32,7 @@ export function createServer(config: Config): McpServer {
   registerGuide(server, client);
   const taskService = new TaskService(client);
   registerTaskTools(server, taskService);
+  registerSkillTools(server, taskService);
   registerTesterTools(server, taskService);
   registerResultTools(server, new ResultsService(client, config.maxScreenshotBytes));
   return server;

@@ -130,6 +130,8 @@ export function formatTaskCard(task: Task, role: Role): string {
 
   const blockers = blockersBlock(task);
   if (blockers) parts.push(blockers);
+  const skills = skillsBlock(task);
+  if (skills) parts.push(skills);
   if (task.question && task.question_text) {
     parts.push(`Вопрос человеку (ждёт ответа):\n${task.question_text}`);
   }
@@ -138,6 +140,28 @@ export function formatTaskCard(task: Task, role: Role): string {
     parts.push(`## Промт агента\n\n${task.agent_prompt.trim()}`);
   }
   return parts.join("\n\n");
+}
+
+/**
+ * Скиллы типа задачи. Тел здесь нет намеренно: карточка должна читаться.
+ * Полный текст берётся инструментом forge_skill_get.
+ */
+function skillsBlock(task: Task): string | null {
+  const skills = task.task_type?.skills ?? [];
+  if (skills.length === 0) return null;
+
+  const lines = skills.map((skill) =>
+    skill.description?.trim()
+      ? `- #${skill.id} ${skill.name} — ${skill.description.trim()}`
+      : `- #${skill.id} ${skill.name}`,
+  );
+  return [
+    "## Скиллы типа",
+    "",
+    ...lines,
+    "",
+    "Прочитайте их перед работой: forge_skill_get с task_id и skill_id.",
+  ].join("\n");
 }
 
 /**

@@ -1,5 +1,5 @@
 import type { ForgeClient } from "./forge-client.js";
-import type { AgentTasks, Named, Task } from "./forge-types.js";
+import type { AgentTasks, Named, Skill, SkillRef, Task } from "./forge-types.js";
 import { roleOf, type Role } from "./format.js";
 
 /** Что агенту доверено менять в отчёте по задаче. Больше — решения человека. */
@@ -47,6 +47,20 @@ export class TaskService {
   async memberId(): Promise<number | null> {
     if (this.#memberId === undefined) await this.queue();
     return this.#memberId ?? null;
+  }
+
+  /**
+   * Скиллы типа задачи. Берутся из карточки: своего списка сервис не держит,
+   * поэтому карточка и список не могут разойтись.
+   */
+  async skills(taskId: number): Promise<readonly SkillRef[]> {
+    const queue = await this.queue();
+    return queue.tasks.find((task) => task.id === taskId)?.task_type?.skills ?? [];
+  }
+
+  /** Полный текст скилла: в карточке его нет — она для чтения, а не для тела. */
+  async skill(taskId: number, skillId: number): Promise<Skill> {
+    return await this.#client.requestJson<Skill>(`/agent/tasks/${taskId}/skills/${skillId}`);
   }
 
   async roleIn(task: Task): Promise<Role> {
