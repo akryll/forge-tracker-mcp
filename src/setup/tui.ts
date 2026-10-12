@@ -38,7 +38,10 @@ function setRaw(enabled: boolean): void {
   if (input.isTTY) input.setRawMode(enabled);
   // readline.close() ставит stdin на паузу. Следующий raw-prompt иначе остаётся
   // без активных handles: Node тихо завершается, а ввод попадает обратно в shell.
+  // Обратное тоже важно: оставленный в resume() stdin не даёт процессу
+  // завершиться после пункта «Выйти».
   if (enabled) input.resume();
+  else input.pause();
 }
 
 export async function menu<T>(
