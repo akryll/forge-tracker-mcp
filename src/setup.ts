@@ -319,6 +319,7 @@ function printHelp(): void {
   forge-mcp-setup --help   эта справка
 
 Путь хранилища можно переопределить переменной FORGE_MCP_CONFIG.
+Для полного стека ошибок задайте FORGE_MCP_DEBUG=1.
 `);
 }
 
@@ -338,7 +339,11 @@ main()
   .catch((error: unknown) => {
     restoreTerminal();
     if (error instanceof Error && error.message === "INTERRUPTED") return;
-    process.stderr.write(`forge-mcp-setup: ${asProfileError(error).message}\n`);
+    const message =
+      process.env.FORGE_MCP_DEBUG === "1" && error instanceof Error
+        ? (error.stack ?? error.message)
+        : asProfileError(error).message;
+    process.stderr.write(`forge-mcp-setup: ${message}\n`);
     process.exitCode = 1;
   })
   .finally(restoreTerminal);
