@@ -36,6 +36,9 @@ export function page(title: string, lines: readonly string[] = []): void {
 
 function setRaw(enabled: boolean): void {
   if (input.isTTY) input.setRawMode(enabled);
+  // readline.close() ставит stdin на паузу. Следующий raw-prompt иначе остаётся
+  // без активных handles: Node тихо завершается, а ввод попадает обратно в shell.
+  if (enabled) input.resume();
 }
 
 export async function menu<T>(
