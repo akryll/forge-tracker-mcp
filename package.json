@@ -1,6 +1,6 @@
 {
   "name": "forge-tracker-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "MCP-сервер поверх агентского API Forge",
   "license": "MIT",
   "repository": {
@@ -16,11 +16,15 @@
   ],
   "type": "module",
   "bin": {
-    "forge-mcp": "dist/index.js"
+    "forge-mcp": "dist/index.js",
+    "forge-mcp-profile": "dist/profile-runner.js",
+    "forge-mcp-setup": "dist/setup.js"
   },
   "main": "dist/index.js",
   "files": [
-    "dist"
+    "dist",
+    "install.sh",
+    "install.ps1"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -28,7 +32,7 @@
     "dev": "tsx src/index.ts",
     "typecheck": "tsc -p tsconfig.check.json",
     "test": "tsx --test test/*.test.ts",
-    "prepublishOnly": "npm run build && npm test"
+    "prepublishOnly": "npm run typecheck && npm run build && npm test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",

@@ -4,7 +4,64 @@ MCP-сервер поверх агентского API Forge. Один адап�
 каждом агенте: Claude Code, Codex и любой следующий агент получают одинаковый
 набор инструментов, а ключ агента остаётся внутри сервера и наружу не выходит.
 
-## Быстрый старт
+## Установка одной строкой
+
+Linux и macOS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/akryll/forge-tracker-mcp/master/install.sh | sh
+```
+
+Windows PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/akryll/forge-tracker-mcp/master/install.ps1 | iex
+```
+
+Скрипт проверит наличие **Node.js 20.11+** и npm, установит пакет и откроет
+интерактивный мастер. В меню можно ходить стрелками, Enter подтверждает выбор,
+Esc возвращает назад.
+
+> Перед публикацией на своём сайте можно положить рядом неизменённые
+> [`install.sh`](install.sh) и [`install.ps1`](install.ps1), а в командах выше
+> заменить адрес. Bootstrap намеренно короткий: он только проверяет среду,
+> выполняет `npm install --global forge-tracker-mcp@latest` и запускает мастер.
+
+## Интерактивная настройка
+
+После обычной установки мастер можно снова открыть в любой момент:
+
+```bash
+forge-mcp-setup
+```
+
+Он умеет:
+
+- создавать сколько угодно профилей — например `claude-work`, `codex-home` и
+  `cursor-test`, каждый со своим адресом Forge и ключом;
+- менять ключ в одном месте, не переписывая настройки всех нейросетей;
+- проверять версию Node.js, npm, доступность Forge и принят ли ключ;
+- подключать профиль к Claude Code, Codex, Claude Desktop, Cursor, Gemini CLI
+  и VS Code/GitHub Copilot;
+- выдавать готовый JSON для любого другого stdio MCP-клиента;
+- сохранять резервную копию JSON клиента перед изменением и не затирать
+  посторонние серверы или настройки.
+
+Ключи лежат в `~/.config/forge-mcp/profiles.json` с правами `0600`; на Windows —
+в `%APPDATA%\\forge-mcp\\profiles.json` под ACL текущего пользователя. Конфиг
+нейросети получает только абсолютный путь к Node.js, профильному раннеру и имя
+профиля — самого ключа там нет. Поэтому обновление ключа в профиле сразу
+действует во всех подключённых клиентах.
+
+Посмотреть профили без секретов:
+
+```bash
+forge-mcp-setup --list
+```
+
+Путь к хранилищу можно переопределить через `FORGE_MCP_CONFIG`.
+
+## Быстрый старт вручную
 
 ```bash
 npm i -g forge-tracker-mcp
@@ -75,7 +132,9 @@ npm i -g forge-tracker-mcp
 ```
 
 Появляется команда `forge-mcp` — она короче имени пакета, и длинных путей до
-`dist/index.js` больше нигде не нужно.
+`dist/index.js` больше нигде не нужно. Дополнительно устанавливаются
+`forge-mcp-setup` (интерактивный мастер) и `forge-mcp-profile` (внутренний
+раннер сохранённых профилей).
 
 Без установки, разово:
 
@@ -86,8 +145,8 @@ npx -y forge-tracker-mcp
 Из исходников — если правите сам сервер:
 
 ```bash
-git clone https://github.com/akryll/forge-mcp-client.git
-cd forge-mcp-client
+git clone https://github.com/akryll/forge-tracker-mcp.git
+cd forge-tracker-mcp
 npm install
 npm run build
 npm link   # чтобы `forge-mcp` заработал и отсюда
