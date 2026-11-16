@@ -12,7 +12,7 @@ const taskId = z
   .positive()
   .describe("Номер задачи — тот, что виден в forge_tasks_list и в ссылке на задачу.");
 
-const MINUTES = "Минуты, от 0 до 1440 — рабочий день целиком.";
+const MINUTES = "Минуты, от 0 до 43 200 — 30 дней; в задаче это «1d2h».";
 
 export function registerTaskTools(server: McpServer, tasks: TaskService): void {
   server.registerTool(
@@ -150,14 +150,14 @@ export function registerTaskTools(server: McpServer, tasks: TaskService): void {
           .number()
           .int()
           .min(0)
-          .max(1440)
+          .max(43200)
           .optional()
           .describe(`Уточнённая оценка трудоёмкости. ${MINUTES}`),
         spent_minutes: z
           .number()
           .int()
           .min(0)
-          .max(1440)
+          .max(43200)
           .optional()
           .describe(`Фактически потраченное время. ${MINUTES}`),
         clear_estimate: z
@@ -307,6 +307,7 @@ export function registerTesterTools(server: McpServer, tasks: TaskService): void
         "Завели задачу для проверки — уберите её потом сами через forge_task_archive:",
         "пока её никому не назначили, это ваше дело, а не человека.",
         "Проект берётся из ключа, указывать его не нужно.",
+        "Эпик можно задать сразу — только из проекта ключа: несуществующий обнулится, чужой отвергнется.",
         "Срок и приоритет не задаются: их расставляет человек, когда берёт задачу в работу.",
       ].join(" "),
       inputSchema: z.object({
@@ -322,13 +323,19 @@ export function registerTesterTools(server: McpServer, tasks: TaskService): void
           .positive()
           .optional()
           .describe("Категория из forge_categories_list — угадывать номер не нужно."),
+        epic_id: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe("Эпик из проекта ключа — чтобы задача не легла в общий список безымянной."),
         estimate_minutes: z
           .number()
           .int()
           .min(0)
-          .max(1440)
+          .max(43200)
           .optional()
-          .describe("Оценка трудоёмкости в минутах, от 0 до 1440."),
+          .describe("Оценка трудоёмкости в минутах, от 0 до 43 200 (30 дней)."),
       }).catchall(FORBIDDEN_FIELD),
       annotations: { openWorldHint: true },
     },

@@ -21,6 +21,8 @@ export interface TaskDraft {
   title: string;
   description?: string;
   category_id?: number;
+  /** Эпик — только из проекта ключа: чужой API отвергнет. */
+  epic_id?: number;
   estimate_minutes?: number;
 }
 

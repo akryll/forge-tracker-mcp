@@ -426,7 +426,7 @@ test("категории отдаются списком, чтобы не уга
   }
 });
 
-test("исполнителя, проекта и срока у заведения задачи нет", async () => {
+test("исполнителя, проекта и срока у заведения задачи нет, а эпик — есть", async () => {
   const h = await harness({});
   try {
     const { tools } = await h.client.listTools();
@@ -434,7 +434,13 @@ test("исполнителя, проекта и срока у заведения
     const fields = Object.keys(
       (create?.inputSchema as { properties?: Record<string, unknown> }).properties ?? {},
     );
-    assert.deepEqual(fields.sort(), ["category_id", "description", "estimate_minutes", "title"]);
+    assert.deepEqual(fields.sort(), [
+      "category_id",
+      "description",
+      "epic_id",
+      "estimate_minutes",
+      "title",
+    ]);
   } finally {
     await h.close();
   }
